@@ -1,0 +1,174 @@
+version: '3'
+services:
+
+  # Servidor DHCP #
+  dhcpd:
+    build: ./dhcp/
+    container_name: isc-dhcp-server
+    hostname: dhcp
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+    image: isc-dhcp-server
+    ports:
+      - "67/udp"
+    volumes:
+      - ./dhcp/dhcpd/dhcpd.conf:/data/dhcpd/dhcpd.conf
+      - ./dhcp/dhcpd/ubuntu.conf:/etc/dhcp/ubuntu.conf
+      - ./dhcp/dhcpd/windows.conf:/etc/dhcp/windows.conf
+    restart: unless-stopped
+    networks:
+      macvlan1:
+        ipv4_address: 192.168.10.200
+
+  # Servidor DNS #
+  bind:
+    image: ubuntu/bind9
+    container_name: bind9
+    hostname: bind
+    volumes:
+      - ./bind-conf/named.conf:/etc/bind/named.conf
+      - ./bind-conf/named.conf.options:/etc/bind/named.conf.options
+      - ./bind-conf/named.conf.default-zones:/etc/bind/named.conf.default-zones
+      - ./bind-conf/named.conf.local:/etc/bind/named.conf.local
+      - ./bind-conf/resolv.conf:/etc/resolv.conf
+      - ./bind-zones/db.insviladegracia.cat:/var/lib/bind/db.insviladegracia.cat
+      - ./bind-zones/db.10.168.192.in-addr.arpa:/var/lib/bind/db.10.168.192.in-addr.arpa
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    command: named -g -c /etc/bind/named.conf
+    networks:
+      macvlan1:
+        ipv4_address: 192.168.10.201
+    restart: unless-stopped
+
+  # Servidor DATABASE MYSQL #
+  db:
+    image: mysql
+    container_name: mysql-server
+    hostname: db
+    environment:
+      MYSQL_ROOT_PASSWORD: 12345aA
+      MYSQL_DATABASE: insviladegracia
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: 12345aA
+    ports:
+      - "3307:3307"
+    command: ["--init-file", "/docker-entrypoint-initdb.d/insviladegracia.sql"]
+    volumes:
+      - ./sql_database/insviladegracia.sql:/docker-entrypoint-initdb.d/insviladegracia.sql
+      - dbdata:/var/lib/mysql
+    networks:
+      macvlan1:
+        ipv4_address: 192.168.10.202
+    restart: unless-stopped
+
+  # Gestor DATABSE PhpMyAdmin #
+  phpmyadmin:
+    image: phpmyadmin
+    container_name: phpmyadmin
+    hostname: phpmyadmin
+    links:
+      - db
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+    depends_on:
+      - db
+    ports:
+      - 8081:80
+    volumes:
+      - phpmyadmin_data:/hola
+    networks:
+      macvlan1:
+        ipv4_address: 192.168.10.203
+    restart: unless-stopped
+
+  # Servidor WEB Apache #
+  apache:
+    build: './apache_docker/'
+    hostname: apache
+    #depends_on:
+      #- php
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./www/:/var/www/html/
+    networks:
+      macvlan1:
+        ipv4_address: 192.168.10.204
+    restart: unless-stopped
+
+  # Servidor SAMBA comparticion de carpetas y impresoras #
+  samba:
+    image: dperson/samba
+    hostname: SAMBA
+    volumes:
+      - ./SAMBA-Professors:/Professors
+      - ./SAMBA-Alumnes:/Alumnes
+      - ./SAMBA-Secretaria:/Secretaria
+      - ./SAMBA-CONFIG/smb.conf:/etc/samba/smb.conf
+      - ./usuarios.sh:/usuarios.sh
+    networks:
+      macvlan1:
+        ipv4_address: 192.168.10.205
+    restart: unless-stopped
+
+  # Servidor DUPLICATI BACKUPS #
+  duplicati:
+    image: linuxserver/duplicati
+    container_name: duplicati
+    hostname: duplicati
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=EUROPE/MADRID
+      - DB_TYPE=mysql
+      - DB_CONNECTION_STRING=Server=db;Port=3306;Database=duplicati;Uid=admin;Pwd=12345aA;
+    volumes:
+      - ./duplicati:/config
+      - ./duplicati_backups:/backups
+      - /home/bernat/PROJECTE_3_ACAVAT:/source
+    ports:
+      - "8200:8200"
+    restart: unless-stopped
+    networks:
+      macvlan1:
+        ipv4_address: 192.168.10.206
+
+  # Servidor PORTAINER gestor de contenedores WEB #
+  portainer:
+    image: portainer/portainer-ce
+    hostname: portainer
+    container_name: portainer-ce
+    ports:
+      - 9000:9000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      macvlan1:
+        ipv4_address: 192.168.10.207
+    restart: always
+
+  # VOLUMENES LOCALES DE DOCKER #
+volumes:
+  dbdata:
+  phpmyadmin_data:
+  duplicati:
+  duplicati_backups:
+  portainer_data:
+
+  # RED PERSONALIZADA PARA TODOS LOS CONTENEDORES #
+networks:
+  macvlan1:
+    driver: macvlan
+    driver_opts:
+      parent: enp2s0
+    ipam:
+      config:
+        - subnet: 192.168.10.0/24
