@@ -1,0 +1,9 @@
+options {
+	directory "/var/lib/bind";
+	listen-on port 53 { 127.0.0.1; 192.168.10.201; };
+	allow-query { 192.168.10.0/24; localhost; };
+	forwarders { 8.8.8.8; 8.8.4.4; };
+        forward  only;
+	dnssec-validation auto;
+	listen-on-v6 { any; };
+};

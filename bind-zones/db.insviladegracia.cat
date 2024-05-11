@@ -1,0 +1,18 @@
+$TTL 604800 ; 1 week
+@ IN SOA bind.insviladegracia.cat. root.insviladegracia.cat. (
+		205 ; serial
+		604800 ; refresh (1 week)
+		86400 ; retry (1 day)
+		2419200 ; expire (4 weeks)
+		604800 ; minimum (1 week)
+		)
+@					IN	NS	bind.insviladegracia.cat.
+dhcp.insviladegracia.cat.		IN	A	192.168.10.200
+bind.insviladegracia.cat.		IN	A	192.168.10.201
+db.insviladegracia.cat.			IN	A	192.168.10.202
+phpmyadmin.insviladegracia.cat.		IN	A	192.168.10.203
+apache.insviladegracia.cat.		IN	A	192.168.10.204
+SAMBA.insviladegracia.cat.		IN	A	192.168.10.205
+duplicati.insviladegracia.cat.		IN	A	192.168.10.206
+portainer.insviladegracia.cat.		IN	A	192.168.10.207
+www.insviladegracia.cat.		IN	CNAME	apache.insviladegracia.cat.
